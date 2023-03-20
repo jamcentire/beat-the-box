@@ -1,66 +1,63 @@
-from typing import Callable
+from typing import Callable, List
 import random
 
 from strategies import (
-    dummy,
-    prioritize_extremes,
-    prioritize_middle
+    PlayerBrain,
+    Strategy
 )
 
 outcomes = []
+guesses = []
 
-def execute_game(strat: Callable = None) -> bool:
+
+def execute_game(strat: str = Strategy.DUMMY, card_counting: bool = False) -> bool:
     # 2 = 2 up to 14 = Ace
     deck = list(range(2,15)) * 4
     random.shuffle(deck)
+    player = PlayerBrain(card_counting, strat)
 
     board = deck[0:9]
     del deck[0:9]
 
     while len(deck) > 0:
-        #print("-------------------------- NEW ROUND ---------------------------------------------")
-        #print("CARDS REMAINING:", len(deck))
-        #print("BOARD STATE:", board)
-
         # If all piles are flipped, we lose
         if len(board) == 0:
-            #print("YOU LOSE")
             return False
 
-        board_posn, eval_guess = strat(board)
-        #print(f"GUESS: position {board_posn} with comparator {eval_guess}")
-
+        # Use our strategy to choose a pile and guess higher or lower
+        board_posn, eval_guess = player.make_guess(board)
         new_card = deck.pop()
-        #print("NEW CARD VAL:", new_card)
+        player.see_card(new_card)
 
         if new_card == board[board_posn]:
             # We never choose "same" - only Higher or Lower. So a "same" result means we automatically lose
-            #print("LOL YOU GOT SAMED")
             del board[board_posn]
+            guesses.append(False)
             continue
 
         if eval_guess(new_card, board[board_posn]):
-            # If we guessed right, replace the card
-            #print("Nailed it")
+            # If correct, replace top card of pile with new card
             board[board_posn] = new_card
+            guesses.append(True)
         else:
-            # If we guessed wrong, flip over the pile
-            #print("Fuck me")
+            # If incorrect, flip over pile
             del board[board_posn]
+            guesses.append(False)
 
     # If we go through the entire deck, we win
-    #print("YOU WIN!!!")
     return True
 
 num_runs = 10000
 
 for i in range(0,num_runs):
-    outcomes.append(execute_game(strat=prioritize_middle))
+    outcomes.append(execute_game(strat=Strategy.RANDOM, card_counting=True))
 
 wins = outcomes.count(True)
 win_pcg = 100 * wins / num_runs
 losses = outcomes.count(False)
 loss_pcg = 100 * losses / num_runs
+guess_pcg = 100 * guesses.count(True) / len(guesses)
 
 print(f"Wins: {wins} ({win_pcg}%)")
 print(f"Losses: {losses} ({loss_pcg}%)")
+print(f"Guesses: {guess_pcg}% correct")
